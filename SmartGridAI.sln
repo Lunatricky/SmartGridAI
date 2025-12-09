@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.36422.26
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartGridAI", "SmartGridAI\SmartGridAI.csproj", "{D02BD4E5-732E-490B-BDE4-5A7501F559B6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D02BD4E5-732E-490B-BDE4-5A7501F559B6}.Debug|x64.ActiveCfg = Debug|x64
+		{D02BD4E5-732E-490B-BDE4-5A7501F559B6}.Debug|x64.Build.0 = Debug|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {0FF9BF61-9BDE-48C2-B1B0-28C4B3DEC5DB}
+	EndGlobalSection
+EndGlobal
