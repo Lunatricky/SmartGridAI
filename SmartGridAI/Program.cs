@@ -31,7 +31,6 @@ namespace IngameScript
  * - Relay targets via TARGET channel
  * - Proper timeouts and AI Flight Behavior toggling
  */
-
         // ----------------- CONFIG -----------------
         const string REMOTE_NAME = "RC";
         const string AI_OFFENSE_NAME = "AI Offensive (Combat)";
@@ -55,10 +54,15 @@ namespace IngameScript
 
         // -----------------------------------------
 
-        IMyRemoteControl rc;
+        StringBuilder logging = new StringBuilder();
+
+        IMyRemoteControl referenceBlock;
         IMyOffensiveCombatBlock aiOffense;
         IMyFlightMovementBlock aiFlight; // used for ApplyAction("BehaviorOn"/"BehaviorOff")
         List<IMyLargeTurretBase> turrets = new List<IMyLargeTurretBase>();
+
+        WorldCoordinates wc;
+
 
         IMyBroadcastListener targetListener;
         IMyBroadcastListener homeListener;
@@ -76,8 +80,14 @@ namespace IngameScript
 
         public Program()
         {
+            Reload();
+        }
+
+        private void Reload()
+        {
+
             // look up blocks by the configured names
-            rc = GridTerminalSystem.GetBlockWithName(REMOTE_NAME) as IMyRemoteControl;
+            referenceBlock = GridTerminalSystem.GetBlockWithName(REMOTE_NAME) as IMyRemoteControl;
             aiOffense = GridTerminalSystem.GetBlockWithName(AI_OFFENSE_NAME) as IMyOffensiveCombatBlock;
             aiFlight = GridTerminalSystem.GetBlockWithName(AI_FLIGHT_NAME) as IMyFlightMovementBlock;
 
@@ -91,37 +101,44 @@ namespace IngameScript
 
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
 
+            logging.Append("");
             Echo("Drone AI initialized.");
-            Echo("RC: " + (rc != null ? rc.CustomName : "NOT FOUND"));
+            Echo("RC: " + (referenceBlock != null ? referenceBlock.CustomName : "NOT FOUND"));
             Echo("AI-Offense: " + (aiOffense != null ? aiOffense.CustomName : "NOT FOUND"));
             Echo("AI-Flight: " + (aiFlight != null ? aiFlight.CustomName : "NOT FOUND"));
 
             // try to ensure AI flight behavior disabled if RC is already autopiloting
-            if (rc != null && rc.IsAutoPilotEnabled)
+            if (referenceBlock != null && referenceBlock.IsAutoPilotEnabled)
                 SetAIFlightBehavior(false);
             else
-                SetAIFlightBehavior(true);   
+                SetAIFlightBehavior(true);
 
             EnableAIOffense(); // enable AI offense block if present
+
+            wc = new WorldCoordinates((IMyFunctionalBlock)referenceBlock);
         }
 
         public void Main(string argument, UpdateType updateSource)
         {
-            Echo("=== DRONE AI TICK ===");
-
-            EnableAIOffense(); // enable AI offense block if present
-
+            switch (argument.ToLower())
+            {
+                case "reload":
+                    Reload();
+                    return;
+                default:
+                    break;
+            }
+            
             // 1) Handle argument (hotbar Run) for GPS home update
             if (!string.IsNullOrWhiteSpace(argument))
             {
                 Vector3D parsed;
-                if (TryParseGPS(argument, out parsed))
+                if (VectorServices.TryParseGPS(argument, out parsed))
                 {
                     homePosition = parsed;
-                    Echo("HOME set via argument: " + FormatVec(homePosition));
+                    Echo("HOME set via argument: " + VectorServices.FormatVec(homePosition));
                     // broadcast to swarm
-                    try { IGC.SendBroadcastMessage(HOME_CHANNEL, homePosition); }
-                    catch { }
+                    IGC.SendBroadcastMessage(HOME_CHANNEL, homePosition);
                 }
                 else
                 {
@@ -136,10 +153,10 @@ namespace IngameScript
                 {
                     var hmsg = homeListener.AcceptMessage();
                     Vector3D hv;
-                    if (TryGetVector(hmsg, out hv))
+                    if (VectorServices.TryGetVector(hmsg, out hv))
                     {
                         homePosition = hv;
-                        Echo("Received HOME update from swarm: " + FormatVec(homePosition));
+                        Echo("Received HOME update from swarm: " + VectorServices.FormatVec(homePosition));
                     }
                 }
             }
@@ -171,7 +188,7 @@ namespace IngameScript
                 return;
             } else if (aiOffense.SearchEnemyComponent.FoundEnemyId != null) 
             {
-                RelayLocalTarget(rc.GetPosition());
+                RelayLocalTarget(referenceBlock.GetPosition());
                 return;
             }
             
@@ -185,9 +202,9 @@ namespace IngameScript
             }
 
             // if already at home (within radius) enable AI flight behavior
-            if (rc != null)
+            if (referenceBlock != null)
             {
-                double distToHome = Vector3D.Distance(rc.GetPosition(), homePosition);
+                double distToHome = Vector3D.Distance(referenceBlock.GetPosition(), homePosition);
                 if (distToHome <= HOME_ARRIVE_RADIUS)
                 {
                     DisableRemoteControl();
@@ -228,7 +245,7 @@ namespace IngameScript
                         lastLocalTarget = info.Position;
                         // reset local cooldown timer
                         localCooldown = LOCAL_COOLDOWN_SECONDS;
-                        Echo("Local turret lock at " + FormatVec(info.Position));
+                        Echo("Local turret lock at " + VectorServices.FormatVec(info.Position));
                         return true;
                     }
                 }
@@ -247,12 +264,12 @@ namespace IngameScript
             {
                 var msg = targetListener.AcceptMessage();
                 Vector3D v;
-                if (TryGetVector(msg, out v))
+                if (VectorServices.TryGetVector(msg, out v))
                 {
                     lastRelayTarget = v;
                     relayLastSeenTimer = 0.0; // reset last seen timer only when fresh data arrived
                     gotAny = true;
-                    Echo("Received relay target: " + FormatVec(v));
+                    Echo("Received relay target: " + VectorServices.FormatVec(v));
                 }
             }
             if (!gotAny)
@@ -275,7 +292,7 @@ namespace IngameScript
                 if (localCooldown <= 0.0)
                 {
                     lastLocalTarget = null;
-                    Echo("Local turret lock expired");
+                    //Local turret lock expired
                 }
             }
 
@@ -297,7 +314,7 @@ namespace IngameScript
         // -------------------- Remote control helpers --------------------
         void FlyToTarget(Vector3D target)
         {
-            if (rc == null)
+            if (referenceBlock == null)
             {
                 Echo("RC not found! Can't fly.");
                 return;
@@ -305,11 +322,11 @@ namespace IngameScript
 
             try
             {
-                rc.ClearWaypoints();
-                rc.AddWaypoint(target, "Target");
-                if (!rc.IsAutoPilotEnabled)
-                    rc.SetAutoPilotEnabled(true);
-                Echo("RC moving to " + FormatVec(target));
+                referenceBlock.ClearWaypoints();
+                referenceBlock.AddWaypoint(target, "Target");
+                if (!referenceBlock.IsAutoPilotEnabled)
+                    referenceBlock.SetAutoPilotEnabled(true);
+                Echo("RC moving to " + VectorServices.FormatVec(target));
             }
             catch (Exception e)
             {
@@ -319,12 +336,12 @@ namespace IngameScript
 
         void DisableRemoteControl()
         {
-            if (rc == null) return;
+            if (referenceBlock == null) return;
             try
             {
-                if (rc.IsAutoPilotEnabled)
-                    rc.SetAutoPilotEnabled(false);
-                rc.ClearWaypoints();
+                if (referenceBlock.IsAutoPilotEnabled)
+                    referenceBlock.SetAutoPilotEnabled(false);
+                referenceBlock.ClearWaypoints();
                 Echo("RC autopilot disabled");
             }
             catch (Exception e)
@@ -358,67 +375,8 @@ namespace IngameScript
         void RelayLocalTarget(Vector3D pos)
         {
             IGC.SendBroadcastMessage(TARGET_CHANNEL, pos);
-            Echo("Relayed local target to swarm: " + FormatVec(pos));
+            Echo("Relayed local target to swarm: " + VectorServices.FormatVec(pos));
         }
-
-        // -------------------- Parsing helpers --------------------
-        bool TryGetVector(MyIGCMessage msg, out Vector3D v)
-        {
-            v = new Vector3D();
-            if (msg.Data is Vector3D)
-            {
-                v = (Vector3D)msg.Data;
-                return true;
-            }
-
-            string s = msg.Data as string;
-            if (s != null)
-                return TryParseSimpleVector(s, out v);
-
-            return false;
-        }
-
-        bool TryParseSimpleVector(string s, out Vector3D v)
-        {
-            v = new Vector3D();
-            if (string.IsNullOrWhiteSpace(s)) return false;
-            var parts = s.Split(',');
-            if (parts.Length != 3) return false;
-
-            double x, y, z;
-            if (!double.TryParse(parts[0], out x)) return false;
-            if (!double.TryParse(parts[1], out y)) return false;
-            if (!double.TryParse(parts[2], out z)) return false;
-
-            v = new Vector3D(x, y, z);
-            return true;
-        }
-
-        // GPS parser for "GPS:name:X:Y:Z:color:" format
-        bool TryParseGPS(string gps, out Vector3D result)
-        {
-            result = new Vector3D();
-            if (string.IsNullOrWhiteSpace(gps)) return false;
-            if (!gps.StartsWith("GPS:")) return false;
-
-            var parts = gps.Split(':');
-            if (parts.Length < 6) return false;
-
-            double x, y, z;
-            if (!double.TryParse(parts[2], out x)) return false;
-            if (!double.TryParse(parts[3], out y)) return false;
-            if (!double.TryParse(parts[4], out z)) return false;
-
-            result = new Vector3D(x, y, z);
-            return true;
-        }
-
-        string FormatVec(Vector3D v)
-        {
-            return string.Format("{0:0.##},{1:0.##},{2:0.##}", v.X, v.Y, v.Z);
-        }
-
-
     }
 }
 
