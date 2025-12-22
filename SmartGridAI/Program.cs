@@ -23,7 +23,6 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
         /* Unified Drone AI Controller
- * - C#6 / PB compatible
  * - Uses Remote Control ("RC") and AI Flight block ("AI Flight (Move)")
  * - Turret local locks override IGC relays
  * - GPS home argument: Run "GPS:name:X:Y:Z:color:"
