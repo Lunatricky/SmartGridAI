@@ -10,82 +10,27 @@ namespace IngameScript
 {
     partial class WorldCoordinates
     {
+        private double PHI = Math.PI * (3.0 - Math.Sqrt(5.0)); // golden angle
 
-        private Vector3I forward = new Vector3I();
-        private Vector3I backward = new Vector3I();
-        private Vector3I up = new Vector3I();
-        private Vector3I down = new Vector3I();
-        private Vector3I left = new Vector3I();
-        private Vector3I right = new Vector3I();
         private IMyFunctionalBlock referenceBlock;
         private MyBlockOrientation _referenceBlockOrientation;
-
-        public Vector3D ForwardOffset
-        {
-            get
-            {
-                return GetWorldPosition(forward);
-            }
-        }
-        public Vector3D BackwardOffset
-        {
-            get
-            {
-                return GetWorldPosition(backward);
-            }
-        }
-        public Vector3D UpOffset
-        {
-            get
-            {
-                return GetWorldPosition(up);
-            }
-        }
-        public Vector3D DownOffset
-        {
-            get
-            {
-                return GetWorldPosition(down);
-            }
-        }
-        public Vector3D LeftOffset
-        {
-            get
-            {
-                return GetWorldPosition(left);
-            }
-        }
-        public Vector3D RightOffset
-        {
-            get
-            {
-                return GetWorldPosition(right);
-            }
-        }
 
         public WorldCoordinates(IMyFunctionalBlock referenceBlock)
         {
             this.referenceBlock = referenceBlock;
-            _referenceBlockOrientation = referenceBlock.Orientation;
-            SetGridVectorOffsets();
         }
 
-        private void SetGridVectorOffsets()
+        Vector3D GetPoint(int i, int n, double radius, Vector3D center)
         {
-            Vector3I home = referenceBlock.Position;
+            double y = 1 - (i / (double)(n - 1)) * 2; // from 1 to -1
+            double r = Math.Sqrt(1 - y * y);
 
-            if (_referenceBlockOrientation == null)
-            {
-                return;
-            }
+            double theta = PHI * i;
 
-            forward = home + Base6Directions.GetIntVector(_referenceBlockOrientation.Forward) * 1000;
-            backward = home - Base6Directions.GetIntVector(_referenceBlockOrientation.Forward) * 1000;
-            up = home + Base6Directions.GetIntVector(_referenceBlockOrientation.Up) * 1000;
-            down = home - Base6Directions.GetIntVector(_referenceBlockOrientation.Up) * 1000;
-            left = home + Base6Directions.GetIntVector(_referenceBlockOrientation.Left) * 1000;
-            right = home - Base6Directions.GetIntVector(_referenceBlockOrientation.Left) * 1000;
+            double x = Math.Cos(theta) * r;
+            double z = Math.Sin(theta) * r;
 
+            return center + new Vector3D(x, y, z) * radius;
         }
 
         public Vector3D GetWorldPosition(Vector3I localPosition)

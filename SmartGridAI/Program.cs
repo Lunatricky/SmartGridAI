@@ -22,8 +22,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        /* Unified Drone AI Controller
- * - C#6 / PB compatible
+        /* Unified Drone AI Controllerz
  * - Uses Remote Control ("RC") and AI Flight block ("AI Flight (Move)")
  * - Turret local locks override IGC relays
  * - GPS home argument: Run "GPS:name:X:Y:Z:color:"
@@ -81,6 +80,7 @@ namespace IngameScript
         public Program()
         {
             Reload();
+            Echo(logging.ToString());
         }
 
         private void Reload()
@@ -101,11 +101,15 @@ namespace IngameScript
 
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
 
-            logging.Append("");
-            Echo("Drone AI initialized.");
-            Echo("RC: " + (referenceBlock != null ? referenceBlock.CustomName : "NOT FOUND"));
-            Echo("AI-Offense: " + (aiOffense != null ? aiOffense.CustomName : "NOT FOUND"));
-            Echo("AI-Flight: " + (aiFlight != null ? aiFlight.CustomName : "NOT FOUND"));
+            
+            string status = "";
+
+            if (referenceBlock == null) status += "RC ";
+            if (aiOffense == null) status += "AI-O ";
+            if (aiFlight == null) status += "AI-F ";
+
+            logging.Append(status.Length == 0 ? "All blocks OK" : "Missing: " + status);
+            if (status.Length != 0) return;
 
             // try to ensure AI flight behavior disabled if RC is already autopiloting
             if (referenceBlock != null && referenceBlock.IsAutoPilotEnabled)
