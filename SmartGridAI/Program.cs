@@ -22,22 +22,34 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+        /*
+         * R e a d m e
+         * -----------
+         * 
+         * In this file you can include any instructions or other comments you want to have injected onto the 
+         * top of your final script. You can safely delete this file if you do not want any such comments.
+         */
+
         /* Unified Drone AI Controller
- * - Uses Remote Control ("RC") and AI Flight block ("AI Flight (Move)")
- * - Turret local locks override IGC relays
- * - GPS home argument: Run "GPS:name:X:Y:Z:color:"
- * - Broadcast new home to swarm via HOME_CHANNEL
- * - Relay targets via TARGET channel
- * - Proper timeouts and AI Flight Behavior toggling
- */
+         * - C#6 / PB compatible
+         * - Uses Remote Control ("RC") and AI Flight block ("AI Flight (Move)")
+         * - Turret local locks override IGC relays
+         * - GPS home argument: Run "GPS:name:X:Y:Z:color:"
+         * - Broadcast new home to swarm via HOME_CHANNEL
+         * - Relay targets via TARGET channel
+         * - Proper timeouts and AI Flight Behavior toggling
+         */
 
         // ----------------- CONFIG -----------------
+        const string ANTENNA_NAME = "Antenna";
         const string REMOTE_NAME = "RC";
         const string AI_OFFENSE_NAME = "AI Offensive (Combat)";
         const string AI_FLIGHT_NAME = "AI Flight (Move)";
 
         const string TARGET_CHANNEL = "TARGET_COORDS";
         const string HOME_CHANNEL = "HOME_COORDS";
+        const string IGC_IFF_MSG = "IGC_IFF_MSG";
+        string RadarListenerChannel = "Radar_Broadcast";
 
         // default home (change if you want another default)
         Vector3D homePosition = new Vector3D(-4009875, -50250, -792578);
@@ -53,6 +65,17 @@ namespace IngameScript
         const double DT = 0.1;
 
         // -----------------------------------------
+        struct CachedTarget
+        {
+            public Vector3D Position;
+            public long GridId;
+            public string GridName;
+            public string FactionTag;
+            public long OwnerID;
+            public string IFF;
+        }
+
+        IMyRadioAntenna antenna;
 
         IMyRemoteControl rc;
         IMyOffensiveCombatBlock aiOffense;
@@ -73,9 +96,15 @@ namespace IngameScript
         // AI Flight behavior state tracking
         bool aiFlightBehaviorOn = true; // assume on initially (we'll try to enable at start)
 
+        IMyProgrammableBlock me;
+
         public Program()
         {
+            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            me = Me;
+
             // look up blocks by the configured names
+            antenna = GridTerminalSystem.GetBlockWithName(ANTENNA_NAME) as IMyRadioAntenna;
             rc = GridTerminalSystem.GetBlockWithName(REMOTE_NAME) as IMyRemoteControl;
             aiOffense = GridTerminalSystem.GetBlockWithName(AI_OFFENSE_NAME) as IMyOffensiveCombatBlock;
             aiFlight = GridTerminalSystem.GetBlockWithName(AI_FLIGHT_NAME) as IMyFlightMovementBlock;
@@ -83,12 +112,10 @@ namespace IngameScript
             GridTerminalSystem.GetBlocksOfType(turrets); // populate turret list
 
             targetListener = IGC.RegisterBroadcastListener(TARGET_CHANNEL);
-            targetListener.SetMessageCallback("IGC-TARGET");
+            targetListener.SetMessageCallback(TARGET_CHANNEL);
 
             homeListener = IGC.RegisterBroadcastListener(HOME_CHANNEL);
-            homeListener.SetMessageCallback("IGC-HOME");
-
-            Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            homeListener.SetMessageCallback(HOME_CHANNEL);
 
             Echo("Drone AI initialized.");
             Echo("RC: " + (rc != null ? rc.CustomName : "NOT FOUND"));
@@ -99,12 +126,95 @@ namespace IngameScript
             if (rc != null && rc.IsAutoPilotEnabled)
                 SetAIFlightBehavior(false);
             else
-                SetAIFlightBehavior(true);   
+                SetAIFlightBehavior(true);
 
             EnableAIOffense(); // enable AI offense block if present
         }
 
+        int tick = 0;
+
         public void Main(string argument, UpdateType updateSource)
+        {
+            if (antenna == null) return;
+
+            // Turn broadcast on briefly
+            antenna.Enabled = true;
+            antenna.EnableBroadcasting = true;
+
+            tick++;
+
+            if (tick % 10 == 0)
+            {
+            }
+
+
+            Echo("Position: " + tuple.Item1);
+            Echo("GridId: " + tuple.Item2);
+            Echo("GridName: " + tuple.Item3);
+            Echo("FactionTag: " + tuple.Item4);
+            Echo("OwnerID: " + tuple.Item5);
+            Echo("IFF: " + tuple.Item6);
+
+            SendFriendlyPositionBurst();
+
+            SmartAI(argument, updateSource);
+
+            // Turn off antenna after a short delay (stealth!)
+            antenna.EnableBroadcasting = false;
+        }
+
+        MyTuple<Vector3D, long, string, string, long, string> tuple;
+        void SendFriendlyPositionBurst()
+        {
+
+            CachedTarget cachedTarget = new CachedTarget();
+
+            Vector3D myPos = me.GetPosition();
+
+            cachedTarget.Position = me.GetPosition();
+            cachedTarget.GridId = me.CubeGrid.EntityId;
+            cachedTarget.GridName = me.CubeGrid.CustomName;
+            cachedTarget.FactionTag = me.GetOwnerFactionTag();
+            cachedTarget.OwnerID = me.OwnerId;
+            cachedTarget.IFF = "friendly";
+
+            tuple = new MyTuple<Vector3D, long, string, string, long, string>(
+                cachedTarget.Position,
+                cachedTarget.GridId,
+                cachedTarget.GridName ?? "",
+                cachedTarget.FactionTag ?? "",
+                cachedTarget.OwnerID,
+                cachedTarget.IFF ?? ""
+            );
+
+            // Send on the channel the bridge is listening to
+            //IGC.SendBroadcastMessage(RADAR_SCRIPT_CHANNEL, tuple);
+
+            var gridRadius = me.CubeGrid.WorldVolume.Radius;
+
+            /*
+                     * Format of these messages is:
+                     * 1. Relationship/alligence
+                     *  Basic:
+                     *  - Neutral = 0
+                     *  - Enemy = 1
+                     *  - Friendly = 2
+                     * Additional:
+                     *  - Locked = 4 (not broadcast, for network notification of lock)
+                     *  - LargeGrid = 8
+                     *  - SmallGrid = 16
+                     * The additional flags are added to the basic, e.g. for large enemy is 1 + 8
+                     * 2. EntityId
+                     * 3. World relative position
+                     * 4. Radius ^ 2 of the grid (for friendly fire detection) (will be zero for non-friendly grids)
+                     */
+            var myTuple = new MyTuple<byte, long, Vector3D, double>(2, me.CubeGrid.EntityId, me.WorldVolume.Center, gridRadius * gridRadius);
+
+            IGC.SendBroadcastMessage(IGC_IFF_MSG, myTuple);
+            IGC.SendBroadcastMessage(RadarListenerChannel, tuple);
+        }
+
+        private void SmartAI(string argument, UpdateType updateSource)
         {
             Echo("=== DRONE AI TICK ===");
 
@@ -119,7 +229,10 @@ namespace IngameScript
                     homePosition = parsed;
                     Echo("HOME set via argument: " + FormatVec(homePosition));
                     // broadcast to swarm
-                    try { IGC.SendBroadcastMessage(HOME_CHANNEL, homePosition); }
+                    try
+                    {
+                        IGC.SendBroadcastMessage(HOME_CHANNEL, homePosition);
+                    }
                     catch { }
                 }
                 else
@@ -168,12 +281,13 @@ namespace IngameScript
             {
                 RelayLocalTarget(lastLocalTarget.Value);
                 return;
-            } else if (aiOffense.SearchEnemyComponent.FoundEnemyId != null) 
+            }
+            else if (aiOffense.SearchEnemyComponent.FoundEnemyId != null)
             {
                 RelayLocalTarget(rc.GetPosition());
                 return;
             }
-            
+
             // If we have a valid relay target, RC should fly toward it and AI behavior should be OFF
             if (lastRelayTarget.HasValue)
             {
@@ -416,8 +530,6 @@ namespace IngameScript
         {
             return string.Format("{0:0.##},{1:0.##},{2:0.##}", v.X, v.Y, v.Z);
         }
-
-
     }
 }
 
