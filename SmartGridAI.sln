@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.36422.26
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartGridAI", "SmartGridAI\SmartGridAI.csproj", "{D02BD4E5-732E-490B-BDE4-5A7501F559B6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IGC Radar Relay", "IGC Radar Relay\IGC Radar Relay.csproj", "{5C29F79F-8ECA-4783-8703-6207436425A3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -12,6 +14,8 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{D02BD4E5-732E-490B-BDE4-5A7501F559B6}.Debug|x64.ActiveCfg = Debug|x64
 		{D02BD4E5-732E-490B-BDE4-5A7501F559B6}.Debug|x64.Build.0 = Debug|x64
+		{5C29F79F-8ECA-4783-8703-6207436425A3}.Debug|x64.ActiveCfg = Debug|x64
+		{5C29F79F-8ECA-4783-8703-6207436425A3}.Debug|x64.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
