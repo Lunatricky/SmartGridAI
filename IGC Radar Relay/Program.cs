@@ -157,7 +157,7 @@ namespace IngameScript
                 IFF = iff
             };
             Echo("***************DEBUG***************");
-            ActiveTargets[gridId] = target;
+            ActiveTargets[sourceId] = target;
         }
 
         void FindBlocks()

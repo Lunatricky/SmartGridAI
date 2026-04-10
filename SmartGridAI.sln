@@ -7,6 +7,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartGridAI", "SmartGridAI\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IGC Radar Relay", "IGC Radar Relay\IGC Radar Relay.csproj", "{5C29F79F-8ECA-4783-8703-6207436425A3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BurstBroadcast", "BurstBroadcast\BurstBroadcast.csproj", "{A080CBAD-F10B-4157-BF4A-43FE53D0B414}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BB sender", "BB sender\BB sender.csproj", "{9CF6C6BF-5229-435D-AE9D-2D6505EE2868}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -16,6 +20,10 @@ Global
 		{D02BD4E5-732E-490B-BDE4-5A7501F559B6}.Debug|x64.Build.0 = Debug|x64
 		{5C29F79F-8ECA-4783-8703-6207436425A3}.Debug|x64.ActiveCfg = Debug|x64
 		{5C29F79F-8ECA-4783-8703-6207436425A3}.Debug|x64.Build.0 = Debug|x64
+		{A080CBAD-F10B-4157-BF4A-43FE53D0B414}.Debug|x64.ActiveCfg = Debug|x64
+		{A080CBAD-F10B-4157-BF4A-43FE53D0B414}.Debug|x64.Build.0 = Debug|x64
+		{9CF6C6BF-5229-435D-AE9D-2D6505EE2868}.Debug|x64.ActiveCfg = Debug|x64
+		{9CF6C6BF-5229-435D-AE9D-2D6505EE2868}.Debug|x64.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

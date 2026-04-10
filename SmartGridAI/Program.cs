@@ -22,16 +22,8 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        /*
-         * R e a d m e
-         * -----------
-         * 
-         * In this file you can include any instructions or other comments you want to have injected onto the 
-         * top of your final script. You can safely delete this file if you do not want any such comments.
-         */
 
         /* Unified Drone AI Controller
-         * - C#6 / PB compatible
          * - Uses Remote Control ("RC") and AI Flight block ("AI Flight (Move)")
          * - Turret local locks override IGC relays
          * - GPS home argument: Run "GPS:name:X:Y:Z:color:"
@@ -42,14 +34,13 @@ namespace IngameScript
 
         // ----------------- CONFIG -----------------
         const string ANTENNA_NAME = "Antenna";
-        const string REMOTE_NAME = "RC";
+        const string REMOTE_NAME = "Remote Control";
         const string AI_OFFENSE_NAME = "AI Offensive (Combat)";
         const string AI_FLIGHT_NAME = "AI Flight (Move)";
 
         const string TARGET_CHANNEL = "TARGET_COORDS";
         const string HOME_CHANNEL = "HOME_COORDS";
         const string IGC_IFF_MSG = "IGC_IFF_MSG";
-        string RadarListenerChannel = "Radar_Broadcast";
 
         // default home (change if you want another default)
         Vector3D homePosition = new Vector3D(-4009875, -50250, -792578);
@@ -75,7 +66,15 @@ namespace IngameScript
             public string IFF;
         }
 
-        IMyRadioAntenna antenna;
+        IMyRadioAntenna Antenna;
+
+        // Burst timing
+        double _sendInterval = 5.0;        // How often to send (seconds)
+        double _timeSinceLastSend = 0.0;
+
+        double _burstLength = 0.12;        // 120ms burst - good balance between reliability and stealth
+        double _burstTimer = 0.0;
+        bool _isBursting = false;
 
         IMyRemoteControl rc;
         IMyOffensiveCombatBlock aiOffense;
@@ -96,6 +95,8 @@ namespace IngameScript
         // AI Flight behavior state tracking
         bool aiFlightBehaviorOn = true; // assume on initially (we'll try to enable at start)
 
+        Dictionary<long, MyTuple<byte, long, Vector3D, double>> ActiveTargets = new Dictionary<long, MyTuple<byte, long, Vector3D, double>>();
+
         IMyProgrammableBlock me;
 
         public Program()
@@ -104,7 +105,7 @@ namespace IngameScript
             me = Me;
 
             // look up blocks by the configured names
-            antenna = GridTerminalSystem.GetBlockWithName(ANTENNA_NAME) as IMyRadioAntenna;
+            Antenna = GridTerminalSystem.GetBlockWithName(ANTENNA_NAME) as IMyRadioAntenna;
             rc = GridTerminalSystem.GetBlockWithName(REMOTE_NAME) as IMyRemoteControl;
             aiOffense = GridTerminalSystem.GetBlockWithName(AI_OFFENSE_NAME) as IMyOffensiveCombatBlock;
             aiFlight = GridTerminalSystem.GetBlockWithName(AI_FLIGHT_NAME) as IMyFlightMovementBlock;
@@ -135,83 +136,58 @@ namespace IngameScript
 
         public void Main(string argument, UpdateType updateSource)
         {
-            if (antenna == null) return;
+            if (Antenna == null || Antenna.Closed) {return;}
 
-            // Turn broadcast on briefly
-            antenna.Enabled = true;
-            antenna.EnableBroadcasting = true;
+            double dt = Runtime.TimeSinceLastRun.TotalSeconds;
 
-            tick++;
+            _timeSinceLastSend += dt;
 
-            if (tick % 10 == 0)
+            // Time to do a burst?
+            if (_timeSinceLastSend >= _sendInterval)
             {
+                SendFriendlyPositionBurst();
+                _timeSinceLastSend = 0.0;
             }
 
-
-            Echo("Position: " + tuple.Item1);
-            Echo("GridId: " + tuple.Item2);
-            Echo("GridName: " + tuple.Item3);
-            Echo("FactionTag: " + tuple.Item4);
-            Echo("OwnerID: " + tuple.Item5);
-            Echo("IFF: " + tuple.Item6);
-
-            SendFriendlyPositionBurst();
+            // Handle active burst
+            if (_isBursting)
+            {
+                _burstTimer += dt;
+                if (_burstTimer >= _burstLength)
+                {
+                    Antenna.EnableBroadcasting = false;
+                    _isBursting = false;
+                }
+            }
 
             SmartAI(argument, updateSource);
-
-            // Turn off antenna after a short delay (stealth!)
-            antenna.EnableBroadcasting = false;
         }
-
-        MyTuple<Vector3D, long, string, string, long, string> tuple;
         void SendFriendlyPositionBurst()
         {
-
-            CachedTarget cachedTarget = new CachedTarget();
-
-            Vector3D myPos = me.GetPosition();
-
-            cachedTarget.Position = me.GetPosition();
-            cachedTarget.GridId = me.CubeGrid.EntityId;
-            cachedTarget.GridName = me.CubeGrid.CustomName;
-            cachedTarget.FactionTag = me.GetOwnerFactionTag();
-            cachedTarget.OwnerID = me.OwnerId;
-            cachedTarget.IFF = "friendly";
-
-            tuple = new MyTuple<Vector3D, long, string, string, long, string>(
-                cachedTarget.Position,
-                cachedTarget.GridId,
-                cachedTarget.GridName ?? "",
-                cachedTarget.FactionTag ?? "",
-                cachedTarget.OwnerID,
-                cachedTarget.IFF ?? ""
-            );
-
-            // Send on the channel the bridge is listening to
-            //IGC.SendBroadcastMessage(RADAR_SCRIPT_CHANNEL, tuple);
-
-            var gridRadius = me.CubeGrid.WorldVolume.Radius;
+            BoundingSphereD worldVolume = me.CubeGrid.WorldVolume;
+            var gridCenter = worldVolume.Center;
+            var gridRadius = worldVolume.Radius;
 
             /*
-                     * Format of these messages is:
-                     * 1. Relationship/alligence
-                     *  Basic:
-                     *  - Neutral = 0
-                     *  - Enemy = 1
-                     *  - Friendly = 2
-                     * Additional:
-                     *  - Locked = 4 (not broadcast, for network notification of lock)
-                     *  - LargeGrid = 8
-                     *  - SmallGrid = 16
-                     * The additional flags are added to the basic, e.g. for large enemy is 1 + 8
-                     * 2. EntityId
-                     * 3. World relative position
-                     * 4. Radius ^ 2 of the grid (for friendly fire detection) (will be zero for non-friendly grids)
-                     */
-            var myTuple = new MyTuple<byte, long, Vector3D, double>(2, me.CubeGrid.EntityId, me.WorldVolume.Center, gridRadius * gridRadius);
+             * Format of these messages is:
+             * 1. Relationship/alligence
+             *  Basic:
+             *  - Neutral = 0
+             *  - Enemy = 1
+             *  - Friendly = 2
+             * Additional:
+             *  - Locked = 4 (not broadcast, for network notification of lock)
+             *  - LargeGrid = 8
+             *  - SmallGrid = 16
+             * The additional flags are added to the basic, e.g. for large enemy is 1 + 8
+             * 2. EntityId
+             * 3. World relative position
+             * 4. Radius ^ 2 of the grid (for friendly fire detection) (will be zero for non-friendly grids)
+             */
+
+            var myTuple = new MyTuple<byte, long, Vector3D, double>(2, me.CubeGrid.EntityId, gridCenter, gridRadius * gridRadius);
 
             IGC.SendBroadcastMessage(IGC_IFF_MSG, myTuple);
-            IGC.SendBroadcastMessage(RadarListenerChannel, tuple);
         }
 
         private void SmartAI(string argument, UpdateType updateSource)
@@ -355,7 +331,6 @@ namespace IngameScript
         {
             if ((updateSource & UpdateType.IGC) == 0) return;
 
-            bool gotAny = false;
             while (targetListener.HasPendingMessage)
             {
                 var msg = targetListener.AcceptMessage();
@@ -364,13 +339,8 @@ namespace IngameScript
                 {
                     lastRelayTarget = v;
                     relayLastSeenTimer = 0.0; // reset last seen timer only when fresh data arrived
-                    gotAny = true;
                     Echo("Received relay target: " + FormatVec(v));
                 }
-            }
-            if (!gotAny)
-            {
-                // no new messages this tick — nothing to do here
             }
         }
 
