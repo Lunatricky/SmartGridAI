@@ -5,7 +5,9 @@ VisualStudioVersion = 16.0.36422.26
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartGridAI", "SmartGridAI\SmartGridAI.csproj", "{D02BD4E5-732E-490B-BDE4-5A7501F559B6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IGC Radar Relay", "IGC Radar Relay\IGC Radar Relay.csproj", "{5C29F79F-8ECA-4783-8703-6207436425A3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Auto CTC Setup", "Auto CTC Setup\Auto CTC Setup.csproj", "{2DFC8777-3B77-41E2-99C0-F6BD88D3ACBB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IGCRelay", "IGCRelay\IGCRelay.csproj", "{AEC895FF-6447-4B68-8EC3-0E775637EA2D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -14,8 +16,10 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{D02BD4E5-732E-490B-BDE4-5A7501F559B6}.Debug|x64.ActiveCfg = Debug|x64
 		{D02BD4E5-732E-490B-BDE4-5A7501F559B6}.Debug|x64.Build.0 = Debug|x64
-		{5C29F79F-8ECA-4783-8703-6207436425A3}.Debug|x64.ActiveCfg = Debug|x64
-		{5C29F79F-8ECA-4783-8703-6207436425A3}.Debug|x64.Build.0 = Debug|x64
+		{2DFC8777-3B77-41E2-99C0-F6BD88D3ACBB}.Debug|x64.ActiveCfg = Debug|x64
+		{2DFC8777-3B77-41E2-99C0-F6BD88D3ACBB}.Debug|x64.Build.0 = Debug|x64
+		{AEC895FF-6447-4B68-8EC3-0E775637EA2D}.Debug|x64.ActiveCfg = Debug|x64
+		{AEC895FF-6447-4B68-8EC3-0E775637EA2D}.Debug|x64.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

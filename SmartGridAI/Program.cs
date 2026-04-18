@@ -32,15 +32,15 @@ namespace IngameScript
  */
 
         // ----------------- CONFIG -----------------
-        const string REMOTE_NAME = "RC";
-        const string AI_OFFENSE_NAME = "AI Offensive (Combat)";
-        const string AI_FLIGHT_NAME = "AI Flight (Move)";
+        const string REMOTE_NAME = "Remote Control SGAI";
+        const string AI_OFFENSE_NAME = "AI Offensive (Combat) SGAI";
+        const string AI_FLIGHT_NAME = "AI Flight (Move) SGAI";
 
         const string TARGET_CHANNEL = "TARGET_COORDS";
         const string HOME_CHANNEL = "HOME_COORDS";
 
         // default home (change if you want another default)
-        Vector3D homePosition = new Vector3D(-4009875, -50250, -792578);
+        Vector3D homePosition;
 
         // timeouts (seconds)
         const double LOCAL_COOLDOWN_SECONDS = 5.0;
@@ -89,6 +89,8 @@ namespace IngameScript
             homeListener.SetMessageCallback("IGC-HOME");
 
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
+
+            homePosition = rc.GetPosition();
 
             Echo("Drone AI initialized.");
             Echo("RC: " + (rc != null ? rc.CustomName : "NOT FOUND"));
